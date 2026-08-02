@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vagary"
+version = "1.0.0"
+description = "Vagary 原创填词作品统计工具"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=2.0",
+    "openpyxl>=3.0",
+    "matplotlib>=3.7",
+    "jieba>=0.42",
+]
+
+[project.scripts]
+vagary = "vagary.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
