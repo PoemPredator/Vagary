@@ -1,223 +1,218 @@
-# 填词作品统计工具（以V大Vagary为例）
+# 填词作品统计工具（Vagary）
 
-统计你写的歌词中哪些词用得多、谁和你合作最频繁。
+帮助你统计填词/歌词作品中的高频词、查看某个词出现在哪些作品、以及统计合作者。项目对中文歌词做分词（支持 jieba 或内置保底算法），并能导出统计表与图表。
+
+---
+
+## 主要功能（快速概览）
+
+- 按作品数统计高频词（同一首歌中重复出现只计一次）。
+- 查询某��词在哪些作品中出现，并列出命中的歌词行。
+- 按「演唱 / 作曲 / 编曲」统计合作者出现频次。
+- 导出 Excel 报表（输出：output/统计结果.xlsx）和图表（output/charts/）。
+- 可通过命令行（无需打开 Notebook）完成全部统计或单词查询。
 
 ---
 
 ## 目录
 
-- [这是什么](#这是什么)
-- [文件夹里都有些啥](#文件夹里都有些啥)
-- [第一次上手（跟着一步步做）](#第一次上手跟着一步步做)
-  - [第 0 步：打开"终端"](#第-0-步打开终端)
-  - [第 1 步：创建虚拟环境](#第-1-步创建虚拟环境)
-  - [第 2 步：激活虚拟环境](#第-2-步激活虚拟环境)
-  - [第 3 步：安装依赖](#第-3-步安装依赖)
-  - [第 4 步：安装本项目](#第-4-步安装本项目)
-  - [第 5 步：打开 Notebook](#第-5-步打开-notebook)
-- [之后怎么用](#之后怎么用)
-- [常见问题](#常见问题)
+- [快速开始（命令行）](#快速开始命令行)
+- [命令行用法示例](#命令行用法示例)
+- [数据格式说明](#数据格式说明)
+- [个人词典与排除词](#个人词典与排除词)
+- [进阶：在没有 jieba 时如何运行](#进阶在没有-jieba-时如何运行)
+- [常见问题 & 排查](#常见问题--排查)
+- [开发与测试](#开发与测试)
 
 ---
 
-## 这是什么
+## 快速开始（命令行）
 
-帮你统计歌词数据——读取 Excel 里的歌词表格，用 jieba 把歌词切成词，然后告诉你：
+下面演示在 Windows 和 macOS / Linux 上的常见操作（假设你已经把仓库克隆到本地，并在仓库根目录）：
 
-- 哪些词在你的作品中出现最多（同一首歌唱多次只算 1 次）
-- 某个词在哪些歌里出现过（附带命中歌词行）
-- 和谁合作最多（演唱、作曲、编曲三种统计）
-- 每首歌命中了多少个全局高频词
+1. 创建并激活虚拟环境
 
----
-
-## 文件夹里都有些啥
-
-```
-Vagary/
-├── README.md                         ← 你正在看的这个文件
-├── pyproject.toml                     ← 让 Python 认识这个项目（不需要管它）
-├── requirements.txt                   ← 依赖清单（pip install 的时候会自动读）
-│
-├── src/vagary/                        ← 程序代码
-│   ├── __init__.py
-│   ├── stats.py                       ← 核心统计：分词、词频、查询、合作者
-│   ├── plotting.py                    ← 画图：词频柱状图、合作者柱状图
-│   └── __main__.py                    ← 命令行入口（不需要管，Notebook 用户忽略）
-│
-├── tests/                             ← 测试
-│   ├── test_basic.py                  ← 自动测试（不需要管）
-│   └── Vagary_统计分析.ipynb          ← ★ 你要打开的文件！Jupyter Notebook
-│
-├── data/                              ← 数据
-│   ├── vagary.xlsx                    ← 你的作品数据表
-│   └── personal_dict_example.txt      ← 个人词典示例
-│
-└── output/                            ← 输出文件（统计表、图表会保存到这里）
-```
-
----
-
-## 第一次上手（跟着一步步做）
-
-下面的步骤**只需要做一次**。做完之后，以后每次只用 2 步就能开始用（见[之后怎么用](#之后怎么用)）。
-
----
-
-### 第 0 步：打开"终端"
-
-> 终端就是一个黑框框窗口，你在里面打字告诉电脑要干什么。
-
-**Windows 10/11 打开方式：**
-
-1. 在 Vagary 文件夹里，**点一下地址栏**（显示 `...\Vagary` 那个白条）
-2. 删掉地址栏里的内容，输入 **`cmd`**，然后按回车
-3. 会弹出一个黑色窗口，光标在闪烁——这就是终端
-
-或者：
-1. 按键盘上的 **`Win + R`**（Win 键就是键盘左下角那个 Windows 标志键）
-2. 输入 `cmd`，点确定
-3. 在终端里输入 `cd `（注意 cd 后面有个空格），然后把 Vagary 文件夹**直接拖进终端窗口**，按回车
-
----
-
-### 第 1 步：创建虚拟环境
-
-> 虚拟环境是什么？你电脑上可能装了多个 Python，或者 pip 装了一堆乱七八糟的包。虚拟环境就是给这个项目**单独划一片干净的地方**，互不干扰。
-
-在终端里输入（复制粘贴也行，在终端里右键粘贴）：
+- Windows (cmd):
 
 ```
 python -m venv .venv
-```
-
-然后按回车。等几秒钟，**什么都不会显示**——没问题，正常现象。这一步在 Vagary 文件夹里悄悄创建了一个叫 `.venv` 的文件夹。
-
----
-
-### 第 2 步：激活虚拟环境
-
-终端里输入：
-
-```
 .venv\Scripts\activate
 ```
 
-按回车。如果一切正常，你会发现**终端的行首多了 `(.venv)`**，像这样：
+- Windows (PowerShell):
 
 ```
-(.venv) C:\...\Vagary>
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-这表示你已经进入虚拟环境了。**以后每次打开终端都要先做这一步**。
+- macOS / Linux:
 
-> 提醒：如果报错说"无法加载文件因为在此系统上禁止运行脚本"，说明你的 PowerShell 执行策略被限制了。输入这条命令解决：
-> ```
-> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-> 然后重新激活。
+```
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
----
-
-### 第 3 步：安装依赖
-
-终端里输入（确保前面有 `(.venv)`）：
+2. 安装依赖并安装本包（可编辑模式，方便开发）
 
 ```
 pip install -r requirements.txt
+pip install -e .
 ```
 
-按回车，它会开始下载几个包（pandas、jieba、matplotlib、jupyterlab 等）。**需要联网**，等一两分钟，最后看到 `Successfully installed ...` 就 OK 了。
+3. 运行完整统计（把结果保存到 output/）：
+
+```
+python -m vagary --data data/vagary.xlsx --output output/
+```
+
+4. 查询某个词在哪些作品出现（只输出匹配列表，不生成图表）：
+
+```
+python -m vagary --data data/vagary.xlsx --search 夜色
+```
+
+运行后会在终端打印摘要，并把 Excel 报表保存到你指定的输出目录，图表会保存在 output/charts/ 下。
 
 ---
 
-### 第 4 步：安装本项目
+## 命令行用法示例
 
-终端里输入（确保前面有 `(.venv)`）：
+vagary 的命令行入口基于 `python -m vagary`，常用选项：
+
+- `--data, -d` : 指定 Excel 数据文件路径，默认 `data/vagary.xlsx`。
+- `--output, -o` : 指定输出目录，默认 `output`。
+- `--user-dict` : 指定个人词典文件（每行一个词，或 jieba 格式的词典）。
+- `--exclude, -e` : 排除词列表（在命令行里空格分隔）。
+- `--search, -s` : 只查询某个词在哪些作品中出现。
+- `--no-jieba` : 不使用 jieba，改用项目内置的保底分词算法。
+
+示例：
+
+- 使用自定义词典并排除若干词，然后运行完整统计：
+
+```
+python -m vagary --data data/vagary.xlsx --output output/ --user-dict data/personal_dict.txt --exclude 我们 你们 一个
+```
+
+- 仅查询某个词（快速）：
+
+```
+python -m vagary --search 夜色
+```
+
+- 如果你���望在没有互联网的环境或没有安装 jieba 的情况下运行：
+
+```
+python -m vagary --no-jieba
+```
+
+---
+
+## 数据格式说明
+
+程序会读取 Excel（默认第一个工作表），**必须包含以下 5 列**（列名必须一致）：
+
+- `歌曲名`
+- `演唱`
+- `作曲`
+- `编曲`
+- `歌词`
+
+注意：
+- `歌词` 列内容会按行拆分以便显示命中歌词行；若某行为空会被视为空字符串。
+- 合作者字段（演唱 / 作曲 / 编曲）会以半角或全角斜杠 `/` / `／` 拆分为多人，例如 `甲/乙/丙`。
+
+---
+
+## 个人词典与排除词
+
+- 个人词典（user dict）格式：每行一个词（也可使用 jieba 的词频/词性格式，后两列可省略）。示例：`data/personal_dict_example.txt`。
+- 使用方法：拷贝示例并命名为 `data/personal_dict.txt`，然后在命令行或 Notebook 中通过 `--user-dict data/personal_dict.txt` 指定。
+- 排除词：通过 `--exclude` 在命令行中传入，例如 `--exclude 我们 你们 一个`；在 Notebook 中请修改 `EXCLUDE_WORDS` 常量所在的单元格并重新运行。
+
+---
+
+## 进阶：在没有 jieba 时如何运行
+
+项目默认会尝试使用 jieba（如果已安装），否则自动降级为内置的“2-4 字滑动窗口”分词策略，能保证即使没有 jieba 也能运行，但分词质量会差一些。
+
+如果你想强制不使用 jieba（例如出于可重复性或调试），加 `--no-jieba`。
+
+若想安装 jieba：
+
+```
+pip install jieba
+```
+
+---
+
+## 常见问题 & 排查
+
+- 报错：ModuleNotFoundError: No module named 'vagary'
+  - 原因：没有执行 `pip install -e .`，或没有激活虚拟环境。
+  - 解决：激活虚拟环境（终端前缀会显示 `(.venv)`），然后执行 `pip install -e .`。
+
+- 报错：找不到数据文件
+  - 请确认 `--data` 指定路径是否正确，或把 `vagary.xlsx` 放到 `data/` 下并使用默认路径。
+
+- 图表中文显示成方框（字体问题）
+  - 原因：系统缺中文字体。请在系统中安装中文字体（如微软雅黑 / SimHei），或在绘图代码中指定本地中文字体路径。
+
+- PowerShell 提示无法加载脚本（激活 .venv 失败）
+  - 在 PowerShell 中可执行：
+
+```
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+然后重新运行激活脚本。
+
+- 个人词典未生效
+  - 确认 `--user-dict` 指定的路径存在且文件编码为 UTF-8（不带 BOM），再运行命令或在 Notebook 重新运行相关单元格。
+
+---
+
+## 开发与测试
+
+- 运行仓库自带测试（需要先安�� pytest）：
+
+```
+pip install pytest
+pytest -q
+```
+
+- 如果你修改了代码并想在本地测试修改效果，请使用可编辑安装：
 
 ```
 pip install -e .
 ```
 
-**注意最后的那个点 `.` 不要漏掉！** 它的意思是"把当前文件夹当成一个 Python 包安装"。
-
-按回车，很快结束。这一步让 Notebook 里 `from vagary import ...` 能正常工作。
+- 输出结果位置：
+  - 报表： `output/统计结果.xlsx`
+  - 图表： `output/charts/` 下若干图片（PNG）
 
 ---
 
-### 第 5 步：打开 Notebook
+## 自动化 / 批量运行（示例）
 
-终端里输入（确保前面有 `(.venv)`）：
+- 在 Linux/macOS 上用 cron 定期运行（示例每周一早上 3 点执行一次）：
 
 ```
-jupyter lab tests/Vagary_统计分析.ipynb
+0 3 * * 1 cd /path/to/Vagary && source .venv/bin/activate && python -m vagary --data data/vagary.xlsx --output output/
 ```
 
-按回车。**浏览器会自动打开 JupyterLab**，Notebook 文件已经加载好了。
-
-点击菜单栏的 **Run → Run All Cells**（全部运行），等几秒钟，就能看到：
-- 2 字 / 3 字 / 4 字高频词表
-- 高频词柱状图
-- "夜色"一词的查询结果示例
-- 每首歌的高频词命中情况
-- 合作者统计（全部合作 / 演唱合作 / 曲合作）
-
-把示例中的查询词换成你想查的词，再运行对应的单元格就行。
+- 在 Windows 上可以用任务计划程序（Task Scheduler）运行等效命令。
 
 ---
 
-## 之后怎么用
+## 贡献 & 联系
 
-**以后每次使用就两步：**
-
-1. **打开终端，进入 Vagary 文件夹，激活虚拟环境：**
-   ```
-   cd Vagary 的路径
-   .venv\Scripts\activate
-   ```
-
-2. **启动 Jupyter：**
-   ```
-   jupyter lab tests/Vagary_统计分析.ipynb
-   ```
-
-或者如果你用的是 Anaconda：
-
-打开 **Anaconda Navigator** → 启动 **JupyterLab** → 在文件浏览器里导航到 `Vagary/tests/` → 双击 `Vagary_统计分析.ipynb`。
-
-**但是**，用 Anaconda 的话，要先在 Anaconda 的命令行里执行一次上面的第 3、4 步（`pip install -r requirements.txt` 然后 `pip install -e .`）。
+欢迎提交 issue 或 PR 来改进：
+- 修复 bug
+- 改进分词或排除策略
+- 增加更多可视化样式
 
 ---
 
-## 常见问题
-
-### Q: "ModuleNotFoundError: No module named 'vagary'"
-
-说明你没做第 4 步（`pip install -e .`），或者不在虚拟环境中。确认终端前面有 `(.venv)`，然后执行 `pip install -e .`。
-
-### Q: 图表中的中文显示为方框
-
-系统缺中文字体。程序已经配置了 Microsoft YaHei → SimHei → Arial Unicode MS 依次尝试，如果都显示方框，去网上下载一个"微软雅黑"字体安装即可。
-
-### Q: 如何修改排除词？
-
-打开 Notebook，找到 `EXCLUDE_WORDS` 那一行，在大括号里增删词语即可。
-
-### Q: 如何使用个人词典？
-
-1. 把 `data/personal_dict_example.txt` 复制一份，改名为 `data/personal_dict.txt`
-2. 在里面写入不希望被切碎的词（每行一个），比如"人间"、"天地"这类
-3. Notebook 里会自动检测到 `personal_dict.txt` 并加载
-
-### Q: 我想更新数据怎么办？
-
-把新的 `vagary.xlsx` 放到 `data/` 文件夹里覆盖旧的（确保列名不变），然后重新运行 Notebook 即可。
-
-### Q: "打开终端"我还是不会
-
-如果你实在不想用终端，还有一个保底办法：安装 [Anaconda](https://www.anaconda.com/download)（点击 Download 安装），它自带图形界面。安装后：
-1. 打开 Anaconda Navigator
-2. 点击 Environments → Create（新建一个环境，起名叫 `vagary`）
-3. 点击新环境的绿色三角 → Open Terminal
-4. 在终端里做上面的第 3、4 步
-5. 以后从 Anaconda Navigator 直接启动 JupyterLab
+如果你希望我把这个 README 直接提交到仓库，我可以代为更新（会在仓库根目录提交一个 README.md 的修改）。若需要我现在就提交，请回复“现在提交”。
