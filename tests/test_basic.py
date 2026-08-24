@@ -113,6 +113,11 @@ class TestCutLyrics:
         assert "人间" in words
         assert "烟火" in words
 
+    def test_no_duplicate_words(self):
+        """cut_lyrics 结果去重（体现粗分+细分并集语义）。"""
+        result = cut_lyrics("人间烟火人间", use_jieba=False)
+        assert len(result) == len(set(result))
+
     def test_empty_string(self):
         """空字符串返回空列表。"""
         assert cut_lyrics("", use_jieba=False) == []
@@ -217,6 +222,23 @@ class TestSearchWord:
             # search_word 使用保底分词，frequency 也用保底分词
             # 但 frequency 可能用了排除词，这里直接验证 search 结果行数 > 0
             assert len(search_result) > 0
+
+    def test_search_matches_raw_substring(self):
+        """search_word 直接在原始歌词中匹配子串，不依赖分词结果。
+
+        用一段几乎不可能被任何分词器切为独立词元的连续子串来验证：
+        只要原始歌词里包含这几个连续字，就应命中。
+        """
+        df = pd.DataFrame([{
+            "歌曲名": "合成测试", "演唱": "tester",
+            "作曲": "", "编曲": "", "歌词": "星河璀璨月光如水照长夜",
+        }])
+        # "河璀璨月光" 是歌词中的 5 字连续子串，保底分词只取 2-4 字、
+        # jieba 也不会把它切为独立词元，但原始歌词确实包含它。
+        result = search_word(df, "河璀璨月光")
+        assert len(result) == 1
+        assert result.iloc[0]["歌曲名"] == "合成测试"
+        assert "河璀璨月光" in result.iloc[0]["命中歌词"]
 
 
 # ---------------------------------------------------------------------------
