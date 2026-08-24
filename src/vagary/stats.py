@@ -78,6 +78,11 @@ def cut_lyrics(
 ) -> list[str]:
     """把歌词分词并仅返回汉字数不少于 2 的词。
 
+    使用 jieba 时会**同时**运行精确模式（细分，``cut_all=False``）与全模式
+    （粗分，``cut_all=True``），两种结果取并集后去重。这样同一段文字的
+    多种切分可能都会被纳入统计——例如"喜怒哀乐"可同时得到"喜怒""哀乐"
+    "喜怒哀乐"等多种词，均计入词频。
+
     Parameters
     ----------
     text : str
@@ -85,13 +90,13 @@ def cut_lyrics(
     user_dict : str | Path | None
         个人词典路径（每行：词语、词频、词性，后两项可省略）。
     use_jieba : bool
-        是否使用 jieba 精确模式。若安装了 jieba 默认使用；否则自动使用
-        保底的 2-4 字短语法。
+        是否使用 jieba 分词。若安装了 jieba 默认使用（粗分+细分并集）；
+        否则自动使用保底的 2-4 字短语法。
 
     Returns
     -------
     list[str]
-        分词结果，仅包含长度 >= 2 的纯汉字词。
+        分词结果（已去重），仅包含长度 >= 2 的纯汉字词。
     """
     if use_jieba:
         try:
@@ -101,12 +106,23 @@ def cut_lyrics(
                 if not dict_path.exists():
                     raise FileNotFoundError(f"找不到个人词典：{dict_path}")
                 jieba.load_userdict(str(dict_path))
-            pieces = jieba.lcut(text, cut_all=False)
+            # 细分（精确模式）：按最合理切分出词；粗分（全模式）：穷举所有可成词片段。
+            # 二者并集可覆盖"喜怒哀乐"同时拆成"喜怒""哀乐"等多种分词方式。
+            fine = jieba.lcut(text, cut_all=False)
+            coarse = jieba.lcut(text, cut_all=True)
+            pieces = fine + coarse
         except ModuleNotFoundError:
             pieces = _fallback_cut(text)
     else:
         pieces = _fallback_cut(text)
-    return [word for word in pieces if len(word) >= 2 and re.fullmatch(r"[\u4e00-\u9fff]+", word)]
+    # 仅保留长度 >= 2 的纯汉字词；去重以体现"并集"语义（保留首次出现顺序）。
+    seen: set[str] = set()
+    result: list[str] = []
+    for word in pieces:
+        if len(word) >= 2 and re.fullmatch(r"[\u4e00-\u9fff]+", word) and word not in seen:
+            seen.add(word)
+            result.append(word)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -183,11 +199,20 @@ def search_word(
     user_dict: str | Path | None = None,
     use_jieba: bool = True,
 ) -> pd.DataFrame:
-    """按作品查询词语，仅返回歌曲名、演唱和命中歌词。
+    """按作品查询词语，直接在**原始歌词**中匹配，返回歌曲名、演唱和命中歌词。
 
     每首命中作品只返回一行；若一首歌有多行命中，这些歌词行会在"命中歌词"
-    单元格中用换行合并。查询使用与 :func:`word_frequency` 相同的分词规则，
-    因此在个人词典和排除词设置一致时，结果行数等于该词的"出现作品数"。
+    单元格中用换行合并。
+
+    查询采用原始歌词的子串匹配，**不再依赖分词结果**：只要某首作品的歌词
+    文本中包含该词语（作为连续子串）即视为命中，即使分词时该词未被切分为
+    独立词元也会被检出。这样与 :func:`word_frequency` 的并集分词口径更一致——
+    例如查询"喜怒"，凡歌词中出现"喜怒"二字（含"喜怒哀乐""喜怒无常"等）的作品
+    都会返回。
+
+    .. note::
+        ``user_dict`` 与 ``use_jieba`` 参数仅为兼容旧调用而保留，当前查询
+        不再经过分词，二者不会影响查询结果。
 
     Parameters
     ----------
@@ -196,9 +221,9 @@ def search_word(
     word : str
         要查询的词语。
     user_dict : str | Path | None
-        个人词典路径。
+        个人词典路径（兼容保留，不影响结果）。
     use_jieba : bool
-        是否使用 jieba 分词。
+        是否使用 jieba 分词（兼容保留，不影响结果）。
 
     Returns
     -------
@@ -211,8 +236,8 @@ def search_word(
     rows: list[dict[str, str]] = []
     for _, work in works.iterrows():
         lyrics = str(work["歌词"])
-        # 先确认该词是完整分词结果，避免"人间"把"人间好处"等更长词误算进来。
-        if word not in set(cut_lyrics(lyrics, user_dict=user_dict, use_jieba=use_jieba)):
+        # 直接在原始歌词中做子串匹配，不再先用分词结果过滤。
+        if word not in lyrics:
             continue
         matched_lines = [
             lyric_line.strip()
@@ -272,7 +297,11 @@ def song_high_frequency_words(
             "前n高频词数量": len(matched_words),
             "命中的前n高频词": "、".join(matched_words),
         })
-    return pd.DataFrame(rows, columns=["歌曲名", "前n高频词数量", "命中的前n高频词"])
+    result_df = pd.DataFrame(rows, columns=["歌曲名", "前n高频词数量", "命中的前n高频词"])
+
+    # 【修改点】按照“前n高频词数量”列进行降序排序
+    # ascending=False 表示数量多的排在前面
+    return result_df.sort_values(by="前n高频词数量", ascending=False)
 
 
 # ---------------------------------------------------------------------------
